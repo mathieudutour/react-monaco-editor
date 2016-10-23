@@ -40,16 +40,19 @@ class MonacoEditor extends React.Component {
   afterViewInit() {
     const { requireConfig } = this.props;
     const loaderUrl = requireConfig.url || 'vs/loader.js';
-    const onGotAmdLoader = () => {
+    const existingRequire = window.require
+    const onGotAmdLoader = (amdRequire) => {
       if (window.__REACT_MONACO_EDITOR_LOADER_ISPENDING__) {
+        amdRequire = window.amdRequire = window.require;
+        window.require = existingRequire;
         // Do not use webpack
         if (requireConfig.paths && requireConfig.paths.vs) {
-          window.require.config(requireConfig);
+          amdRequire.config(requireConfig);
         }
       }
       
       // Load monaco
-      window.require(['vs/editor/editor.main'], () => {
+      amdRequire(['vs/editor/editor.main'], () => {
         this.initMonaco();
       });
 
@@ -60,7 +63,7 @@ class MonacoEditor extends React.Component {
         if (loaderCallbacks && loaderCallbacks.length) {
           let currentCallback = loaderCallbacks.shift();
           while (currentCallback) {
-            currentCallback.fn.call(currentCallback.context);
+            currentCallback.fn.call(currentCallback.context, amdRequire);
             currentCallback = loaderCallbacks.shift();
           }
         }
@@ -77,7 +80,7 @@ class MonacoEditor extends React.Component {
         fn: onGotAmdLoader
       });
     } else {
-      if (typeof window.require === 'undefined') {
+      if (typeof window.amdRequire === 'undefined') {
         var loaderScript = document.createElement('script');
         loaderScript.type = 'text/javascript';
         loaderScript.src = loaderUrl;
@@ -85,7 +88,7 @@ class MonacoEditor extends React.Component {
         document.body.appendChild(loaderScript);
         window.__REACT_MONACO_EDITOR_LOADER_ISPENDING__ = true;
       } else {
-        onGotAmdLoader();
+        onGotAmdLoader(window.amdRequire);
       }
     }
   }
